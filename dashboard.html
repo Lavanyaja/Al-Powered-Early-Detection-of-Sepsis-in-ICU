@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SepsiSense AI — ICU Early Sepsis Detection Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#0b1220; --bg2:#0f1830; --card:#121b34; --card2:#16213f;
+  --border:#23304f; --text:#e8edf9; --muted:#8c9bbd;
+  --accent:#5ee0c4; --accent2:#7c9bff;
+  --low:#3ddc97; --med:#ffc857; --high:#ff5d6c;
+  --shadow: 0 10px 30px rgba(0,0,0,0.35);
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{
+  font-family:'Inter',sans-serif; background:radial-gradient(circle at 20% -10%, #1a2a52 0%, var(--bg) 45%) fixed;
+  color:var(--text); min-height:100vh; padding:28px 36px 60px;
+}
+h1,h2,h3,.brand{font-family:'Space Grotesk',sans-serif;}
+.topbar{display:flex; justify-content:space-between; align-items:center; margin-bottom:28px; flex-wrap:wrap; gap:16px;}
+.brand{display:flex; align-items:center; gap:12px;}
+.brand .logo{
+  width:46px; height:46px; border-radius:14px;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  display:flex; align-items:center; justify-content:center; font-size:22px; font-weight:800; color:#08111f;
+  box-shadow:0 6px 18px rgba(94,224,196,0.35);
+}
+.brand h1{font-size:22px; font-weight:700; letter-spacing:0.5px;}
+.brand p{font-size:12.5px; color:var(--muted); margin-top:2px;}
+.upload-area{
+  display:flex; align-items:center; gap:10px; background:var(--card);
+  border:1px dashed var(--border); border-radius:14px; padding:10px 16px; font-size:13px; color:var(--muted);
+}
+.upload-area input[type=file]{display:none;}
+.upload-btn{
+  background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#08111f; font-weight:700;
+  padding:8px 16px; border-radius:10px; cursor:pointer; font-size:13px; border:none;
+}
+
+.stats-grid{
+  display:grid; grid-template-columns:repeat(5,1fr); gap:18px; margin-bottom:26px;
+}
+@media(max-width:1100px){.stats-grid{grid-template-columns:repeat(2,1fr);}}
+.stat-card{
+  background:linear-gradient(160deg,var(--card2),var(--card)); border:1px solid var(--border);
+  border-radius:18px; padding:20px; box-shadow:var(--shadow); position:relative; overflow:hidden;
+}
+.stat-card::after{
+  content:""; position:absolute; right:-30px; top:-30px; width:90px; height:90px; border-radius:50%;
+  background:radial-gradient(circle, rgba(94,224,196,0.18), transparent 70%);
+}
+.stat-card .label{font-size:12.5px; color:var(--muted); text-transform:uppercase; letter-spacing:1px; font-weight:600;}
+.stat-card .value{font-size:34px; font-weight:800; margin-top:8px; font-family:'Space Grotesk',sans-serif;}
+.stat-card.high .value{color:var(--high);}
+.stat-card.med .value{color:var(--med);}
+.stat-card.low .value{color:var(--low);}
+.stat-card.total .value{color:var(--accent2);}
+
+.main-grid{display:grid; grid-template-columns:2.2fr 1fr; gap:22px; margin-bottom:24px;}
+@media(max-width:1100px){.main-grid{grid-template-columns:1fr;}}
+
+.panel{
+  background:var(--card); border:1px solid var(--border); border-radius:18px;
+  padding:22px; box-shadow:var(--shadow);
+}
+.panel h2{font-size:17px; font-weight:700; margin-bottom:14px; display:flex; align-items:center; gap:8px;}
+.panel h2 .dot{width:9px; height:9px; border-radius:50%; background:var(--accent);}
+
+.filters{display:flex; gap:10px; margin-bottom:16px; flex-wrap:wrap; align-items:center;}
+.filters input{
+  flex:1; min-width:180px; background:var(--card2); border:1px solid var(--border); border-radius:10px;
+  padding:10px 14px; color:var(--text); font-size:13.5px; outline:none;
+}
+.filters select{
+  background:var(--card2); border:1px solid var(--border); border-radius:10px;
+  padding:10px 14px; color:var(--text); font-size:13.5px; outline:none; cursor:pointer;
+}
+.filters input:focus, .filters select:focus{border-color:var(--accent);}
+
+table{width:100%; border-collapse:collapse; font-size:13.5px;}
+thead th{
+  text-align:left; padding:10px 12px; color:var(--muted); font-weight:600; font-size:11.5px;
+  text-transform:uppercase; letter-spacing:0.8px; border-bottom:1px solid var(--border); position:sticky; top:0; background:var(--card);
+}
+tbody td{padding:12px 12px; border-bottom:1px solid rgba(255,255,255,0.04);}
+tbody tr{transition:background 0.15s;}
+tbody tr:hover{background:rgba(124,155,255,0.06); cursor:pointer;}
+.table-wrap{max-height:520px; overflow-y:auto;}
+
+.badge{
+  padding:4px 12px; border-radius:999px; font-weight:700; font-size:11.5px; letter-spacing:0.5px;
+  display:inline-flex; align-items:center; gap:6px;
+}
+.badge.High{background:rgba(255,93,108,0.15); color:var(--high); border:1px solid rgba(255,93,108,0.35);}
+.badge.Medium{background:rgba(255,200,87,0.15); color:var(--med); border:1px solid rgba(255,200,87,0.35);}
+.badge.Low{background:rgba(61,220,151,0.15); color:var(--low); border:1px solid rgba(61,220,151,0.35);}
+.badge a{color:inherit; text-decoration:underline; font-weight:700; margin-left:4px;}
+
+.risk-link{
+  background:none; border:none; color:inherit; font-weight:700; font-size:11.5px;
+  text-decoration:underline; cursor:pointer; padding:0; opacity:0.85;
+}
+
+.chart-card{margin-bottom:22px;}
+.charts-row{display:grid; grid-template-columns:1fr 1fr; gap:22px;}
+@media(max-width:1100px){.charts-row{grid-template-columns:1fr;}}
+
+/* Modal */
+.overlay{
+  position:fixed; inset:0; background:rgba(5,9,20,0.65); backdrop-filter:blur(4px);
+  display:none; align-items:center; justify-content:center; z-index:100;
+}
+.overlay.active{display:flex;}
+.modal{
+  background:var(--card2); border:1px solid var(--border); border-radius:20px; padding:28px;
+  width:520px; max-width:90vw; max-height:85vh; overflow-y:auto; box-shadow:0 20px 60px rgba(0,0,0,0.5);
+}
+.modal h2{font-size:20px; margin-bottom:4px;}
+.modal .sub{color:var(--muted); font-size:13px; margin-bottom:18px;}
+.modal-grid{display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:18px;}
+.modal-item{background:var(--card); border:1px solid var(--border); border-radius:12px; padding:12px;}
+.modal-item .l{font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.8px;}
+.modal-item .v{font-size:16px; font-weight:700; margin-top:4px;}
+.reason-list{display:flex; flex-direction:column; gap:8px; margin-bottom:18px;}
+.reason{
+  border-radius:10px; padding:10px 14px; font-size:13px;
+  display:flex; justify-content:space-between; align-items:center; gap:10px;
+}
+/* Severity-tiered coloring — a mildly-off reading must NOT look identical
+   to a truly severe one, regardless of the patient's overall risk level. */
+.reason.tier-mild{
+  background:rgba(255,200,87,0.08); border:1px solid rgba(255,200,87,0.25);
+}
+.reason.tier-moderate{
+  background:rgba(255,159,67,0.10); border:1px solid rgba(255,159,67,0.3);
+}
+.reason.tier-severe{
+  background:rgba(255,93,108,0.08); border:1px solid rgba(255,93,108,0.25);
+}
+.reason .name{font-weight:600;}
+.reason .sub-note{font-weight:400; color:var(--muted); font-size:11.5px;}
+.reason .badge2{font-size:11px; font-weight:700; white-space:nowrap; text-align:right;}
+.reason.tier-mild .badge2{color:var(--med);}
+.reason.tier-moderate .badge2{color:#ff9f43;}
+.reason.tier-severe .badge2{color:var(--high);}
+.reason-heading{font-size:14px; margin-bottom:10px; color:var(--muted); font-weight:700;}
+.vitals-strip{display:grid; grid-template-columns:repeat(5,1fr); gap:8px; margin-bottom:18px;}
+.vital-chip{background:var(--card); border:1px solid var(--border); border-radius:10px;
+            padding:9px 10px; text-align:center;}
+.vital-chip .vl{font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.5px;}
+.vital-chip .vv{font-size:15px; font-weight:700; margin-top:3px;}
+.vital-chip.abnormal{border-color:rgba(255,159,67,0.4);}
+.vital-chip.abnormal .vv{color:#ff9f43;}
+.close-btn{
+  position:absolute; top:18px; right:18px; background:none; border:none; color:var(--muted); font-size:22px; cursor:pointer;
+}
+.modal{position:relative;}
+.notify-btn{
+  width:100%; padding:13px; border-radius:12px; border:none; cursor:pointer; font-weight:700; font-size:14px;
+  background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#08111f;
+}
+.notify-msg{
+  margin-top:12px; padding:12px 14px; background:rgba(61,220,151,0.1); border:1px solid rgba(61,220,151,0.3);
+  border-radius:10px; font-size:13px; color:var(--low); display:none;
+}
+.notify-msg.active{display:block;}
+
+.upload-status{font-size:12px; color:var(--accent); margin-left:4px;}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">
+    <div class="logo">S+</div>
+    <div>
+      <h1>SepsiSense AI</h1>
+      <p>AI-Powered Early Detection of Sepsis in ICUs · PhysioNet Challenge 2019</p>
+    </div>
+  </div>
+  <div class="upload-area">
+    📂 <span id="uploadLabel">Upload patient vitals dataset (.psv / .csv)</span>
+    <label class="upload-btn">Choose File<input type="file" id="fileInput"></label>
+    <span class="upload-status" id="uploadStatus"></span>
+  </div>
+</div>
+
+<div class="stats-grid">
+  <div class="stat-card total"><div class="label">Total Patients</div><div class="value" id="statTotal">—</div></div>
+  <div class="stat-card high"><div class="label">High Risk</div><div class="value" id="statHigh">—</div></div>
+  <div class="stat-card med"><div class="label">Medium Risk</div><div class="value" id="statMed">—</div></div>
+  <div class="stat-card low"><div class="label">Low Risk</div><div class="value" id="statLow">—</div></div>
+  <div class="stat-card"><div class="label">Avg Risk Score</div><div class="value" id="statAvg" style="color:var(--accent)">—</div></div>
+</div>
+
+<div class="charts-row chart-card">
+  <div class="panel">
+    <h2><span class="dot"></span>Risk Distribution</h2>
+    <canvas id="riskChart" height="180"></canvas>
+  </div>
+  <div class="panel">
+    <h2><span class="dot"></span>Datasets Loaded</h2>
+    <canvas id="datasetChart" height="180"></canvas>
+  </div>
+</div>
+
+<div class="panel">
+  <h2><span class="dot"></span>ICU Patient Risk Monitor</h2>
+  <div class="filters">
+    <input type="text" id="searchBox" placeholder="Search by patient ID or name...">
+    <select id="riskFilter">
+      <option value="all">All Risk Levels</option>
+      <option value="high">High Risk</option>
+      <option value="medium">Medium Risk</option>
+      <option value="low">Low Risk</option>
+    </select>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Patient ID</th><th>Name</th><th>Age</th><th>Gender</th><th>ICU LOS (hrs)</th>
+          <th>Risk Score</th><th>Risk Level</th><th>Assigned Guide</th>
+        </tr>
+      </thead>
+      <tbody id="patientTable"></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="overlay" id="modalOverlay">
+  <div class="modal">
+    <button class="close-btn" onclick="closeModal()">×</button>
+    <h2 id="modalName">—</h2>
+    <div class="sub" id="modalSub">—</div>
+
+    <div class="modal-grid">
+      <div class="modal-item"><div class="l">Patient ID</div><div class="v" id="mPid">—</div></div>
+      <div class="modal-item"><div class="l">Risk Score</div><div class="v" id="mRisk">—</div></div>
+      <div class="modal-item"><div class="l">Age / Gender</div><div class="v" id="mAge">—</div></div>
+      <div class="modal-item"><div class="l">Assigned Guide</div><div class="v" id="mGuide">—</div></div>
+    </div>
+
+    <h3 class="reason-heading">Current Vitals</h3>
+    <div class="vitals-strip" id="vitalsStrip"></div>
+
+    <h3 class="reason-heading" id="reasonHeading">Clinical Risk Indicators</h3>
+    <div class="reason-list" id="reasonList"></div>
+
+    <button class="notify-btn" onclick="notifyGuide()">📨 Notify Assigned Guide / Doctor</button>
+    <div class="notify-msg" id="notifyMsg"></div>
+  </div>
+</div>
+
+<script>
+let allPatients = [];
+let currentPatientId = null;
+
+async function loadSummary(){
+  const r = await fetch('/api/summary');
+  const d = await r.json();
+  document.getElementById('statTotal').textContent = d.total_patients.toLocaleString();
+  document.getElementById('statHigh').textContent = d.high_risk.toLocaleString();
+  document.getElementById('statMed').textContent = d.medium_risk.toLocaleString();
+  document.getElementById('statLow').textContent = d.low_risk.toLocaleString();
+  document.getElementById('statAvg').textContent = d.avg_risk_score + '%';
+
+  new Chart(document.getElementById('riskChart'), {
+    type:'doughnut',
+    data:{
+      labels:['Low Risk','Medium Risk','High Risk'],
+      datasets:[{data:[d.low_risk,d.medium_risk,d.high_risk],
+        backgroundColor:['#3ddc97','#ffc857','#ff5d6c'], borderWidth:0}]
+    },
+    options:{plugins:{legend:{labels:{color:'#e8edf9'}}}, cutout:'65%'}
+  });
+
+  new Chart(document.getElementById('datasetChart'), {
+    type:'bar',
+    data:{
+      labels:d.datasets.map(x=>x.name),
+      datasets:[{label:'Patients', data:d.datasets.map(x=>x.patients),
+        backgroundColor:['#7c9bff','#5ee0c4'], borderRadius:8}]
+    },
+    options:{
+      scales:{
+        x:{ticks:{color:'#8c9bbd'}, grid:{color:'rgba(255,255,255,0.05)'}},
+        y:{ticks:{color:'#8c9bbd'}, grid:{color:'rgba(255,255,255,0.05)'}}
+      },
+      plugins:{legend:{display:false}}
+    }
+  });
+}
+
+async function loadPatients(){
+  const search = document.getElementById('searchBox').value;
+  const risk = document.getElementById('riskFilter').value;
+  const r = await fetch(`/api/patients?search=${encodeURIComponent(search)}&risk=${risk}`);
+  const data = await r.json();
+  allPatients = data;
+  renderTable(data.slice(0, 300));
+}
+
+function renderTable(rows){
+  const tbody = document.getElementById('patientTable');
+  tbody.innerHTML = '';
+  for(const p of rows){
+    const tr = document.createElement('tr');
+    tr.onclick = ()=>openModal(p.patient_id);
+    let riskCell = `<span class="badge ${p.risk_level}">${p.risk_level}`;
+    riskCell += ` <button class="risk-link" onclick="event.stopPropagation(); openModal('${p.patient_id}')">why?</button>`;
+    riskCell += `</span>`;
+    tr.innerHTML = `
+      <td><strong>${p.patient_id}</strong></td>
+      <td>${p.patient_name}</td>
+      <td>${p.Age}</td>
+      <td>${p.Gender}</td>
+      <td>${p.ICU_LOS}</td>
+      <td>${p.risk_score}%</td>
+      <td>${riskCell}</td>
+      <td>${p.assigned_guide}</td>
+    `;
+    tbody.appendChild(tr);
+  }
+}
+
+async function openModal(pid){
+  currentPatientId = pid;
+  const r = await fetch(`/api/patient/${pid}`);
+  const p = await r.json();
+
+  document.getElementById('modalName').textContent = p.patient_name;
+  document.getElementById('modalSub').textContent = `Risk Level: ${p.risk_level} · Predicted Sepsis: ${p.predicted_label === 1 ? 'Yes' : 'No'}`;
+  document.getElementById('mPid').textContent = p.patient_id;
+  document.getElementById('mRisk').textContent = p.risk_score + '%';
+  document.getElementById('mAge').textContent = `${p.Age} yrs / ${p.Gender}`;
+  document.getElementById('mGuide').textContent = p.assigned_guide;
+
+  // Always-visible vitals strip — shows HR, Temp, Resp, Blood Sugar
+  // (Glucose), O2 Sat whether or not they're abnormal, so sugar level
+  // is never hidden just because it happened to be in normal range.
+  const vStrip = document.getElementById('vitalsStrip');
+  vStrip.innerHTML = '';
+  if(p.key_vitals){
+    const order = ['HR','Temp','Resp','Glucose','O2Sat'];
+    for(const key of order){
+      const kv = p.key_vitals[key];
+      if(!kv) continue;
+      const label = key === 'Glucose' ? 'Blood Sugar' : kv.label;
+      const chip = document.createElement('div');
+      chip.className = 'vital-chip' + (kv.is_abnormal ? ' abnormal' : '');
+      const valText = kv.value === null ? '—' : `${kv.value}${kv.unit ? ' '+kv.unit : ''}`;
+      chip.innerHTML = `<div class="vl">${label}</div><div class="vv">${valText}</div>`;
+      vStrip.appendChild(chip);
+    }
+  }
+
+  // Heading text must always match this specific patient's actual risk level —
+  // never hardcode "High Risk" here.
+  const HEADING_BY_LEVEL = {
+    High:   '\u26a0\ufe0f Why this patient is flagged HIGH RISK',
+    Medium: '\u2139\ufe0f Contributing Risk Factors (Medium Risk)',
+    Low:    '\u2705 Risk Assessment Summary (Low Risk)'
+  };
+  document.getElementById('reasonHeading').textContent =
+    HEADING_BY_LEVEL[p.risk_level] || 'Clinical Risk Indicators';
+
+  const list = document.getElementById('reasonList');
+  list.innerHTML = '';
+  if(p.reasons && p.reasons.length){
+    for(const reason of p.reasons){
+      const div = document.createElement('div');
+      const tierCss = reason.tier_css || 'severe';
+      div.className = `reason tier-${tierCss}`;
+      const noteHtml = reason.note ? ` <span class="sub-note">(${reason.note})</span>` : '';
+      const unitHtml = reason.unit ? ` ${reason.unit}` : '';
+      const arrow = reason.status === 'Above Normal' ? '▲' : '▼';
+      const tierLabel = reason.tier || reason.status;
+      div.innerHTML = `<span class="name">${reason.feature}: ${reason.value}${unitHtml}${noteHtml}</span>
+        <span class="badge2">${tierLabel.toUpperCase()} ${arrow}<br>normal ${reason.normal_range}</span>`;
+      list.appendChild(div);
+    }
+  } else {
+    list.innerHTML = '<div class="reason" style="background:rgba(61,220,151,0.08); border-color:rgba(61,220,151,0.25); color:var(--low);">No major abnormalities detected — vitals within typical range.</div>';
+  }
+
+  document.getElementById('notifyMsg').classList.remove('active');
+  document.getElementById('modalOverlay').classList.add('active');
+}
+
+function closeModal(){
+  document.getElementById('modalOverlay').classList.remove('active');
+}
+
+async function notifyGuide(){
+  const r = await fetch(`/api/notify/${currentPatientId}`, {method:'POST'});
+  const d = await r.json();
+  const msg = document.getElementById('notifyMsg');
+  msg.textContent = '✅ ' + d.message;
+  msg.classList.add('active');
+}
+
+document.getElementById('searchBox').addEventListener('input', debounce(loadPatients, 300));
+document.getElementById('riskFilter').addEventListener('change', loadPatients);
+document.getElementById('modalOverlay').addEventListener('click', (e)=>{
+  if(e.target.id === 'modalOverlay') closeModal();
+});
+
+document.getElementById('fileInput').addEventListener('change', (e)=>{
+  const f = e.target.files[0];
+  if(f){
+    document.getElementById('uploadStatus').textContent = `✓ "${f.name}" queued (re-run training to include new data)`;
+  }
+});
+
+function debounce(fn, delay){
+  let t;
+  return (...args)=>{ clearTimeout(t); t = setTimeout(()=>fn(...args), delay); };
+}
+
+loadSummary();
+loadPatients();
+</script>
+</body>
+</html>
