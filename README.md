@@ -27,8 +27,5 @@ Python 3.11 · TensorFlow/Keras · scikit-learn · NumPy · Pandas · PyArrow ·
 Federated learning, wearable/IoT integration, fairness constraints,
 LLM-generated alert summaries, sepsis subtype classification, clinical trials.
 
-## Team
-Komala K, Lavanya J, Madhumitha R. Guide: Ms. Sumana.
-School of Computer Applications, Dayananda Sagar University (Course 25MCA4207, Skill Building Project)
 
 > Research/academic project. Not a certified medical device.
